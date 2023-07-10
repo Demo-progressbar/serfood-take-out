@@ -50,6 +50,8 @@ public class LoginCheckFilter implements Filter {
             return;
         }
 
+
+
         //判斷員工是否登入, 未登入直接跳轉回登入頁面
         Long empId = (Long) request.getSession().getAttribute("employee");
 

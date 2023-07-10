@@ -10,6 +10,7 @@ import com.seafood.utils.ValidateCodeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -26,10 +28,13 @@ import java.util.Map;
 public class UserController {
 
     @Autowired
-    UserService userService;
+    private UserService userService;
 
     @Autowired
-    JavaMailSender javaMailSender;
+    private JavaMailSender javaMailSender;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 發送驗證碼
@@ -60,8 +65,12 @@ public class UserController {
             message.setText("您的燈入驗證碼為: "+code);
             javaMailSender.send(message);
             */
+
             //把生成的驗證碼存入session
-            session.setAttribute(phone,code);
+            //session.setAttribute(phone,code);
+
+            //使用redis儲存登入驗證碼
+            redisTemplate.opsForValue().set(phone ,code , 5l , TimeUnit.MINUTES);
 
             return Result.success("驗證碼發送成功");
 
@@ -86,7 +95,11 @@ public class UserController {
 
         String code = map.get("code").toString();
 
-        Object sessionInCode = session.getAttribute(phone);
+        //從session獲取驗證碼
+        //Object sessionInCode = session.getAttribute(phone);
+
+        //從redis獲取驗證碼
+        Object sessionInCode = redisTemplate.opsForValue().get(phone);
 
         //判斷用戶輸入的code是否正確
         if(sessionInCode != null && sessionInCode.equals(code)){
@@ -108,6 +121,10 @@ public class UserController {
             }
             //將登入的用戶訊息存入session
             session.setAttribute("user" ,user.getId());
+
+            //登入成功, 刪除redis緩存中的驗證碼數據
+            redisTemplate.delete(phone);
+
             return Result.success(user);
 
         }

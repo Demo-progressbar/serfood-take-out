@@ -12,9 +12,12 @@ import com.seafood.service.DishService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @RestController
@@ -23,10 +26,12 @@ import java.util.stream.Collectors;
 public class DishController {
     @Autowired
     private DishService dishService;
-    @Autowired
-    private DishFlavorService dishFlavorService;
+
     @Autowired
     private CategoryService categoryService;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 新增菜品
@@ -39,6 +44,10 @@ public class DishController {
         log.info("dishDto = {}",dishDto);
 
         dishService.saveWithFlavor(dishDto);
+
+        //清除所有redis緩存
+        Set keys = redisTemplate.keys("dish_*");
+        redisTemplate.delete(keys);
 
         return Result.success("新增菜品成功");
     }
@@ -122,6 +131,14 @@ public class DishController {
 
         dishService.updateWithFlavor(dishDto);
 
+        //清除所有redis緩存
+        Set keys = redisTemplate.keys("dish_*");
+        redisTemplate.delete(keys);
+
+        //精確清除對應key的緩存
+        //String key = "dish_"+dishDto.getCategoryId()+"_1";
+        //redisTemplate.delete(key);
+
         return Result.success("菜品修改成功");
     }
 
@@ -153,6 +170,10 @@ public class DishController {
         log.info("接受到的status = {} , dishID = {}",status,ids);
 
         dishService.updateStatusByIds(status,ids);
+
+        //清除所有redis緩存
+        Set keys = redisTemplate.keys("dish_*");
+        redisTemplate.delete(keys);
 
         return Result.success("售賣狀態修改成功");
     }
@@ -189,6 +210,26 @@ public class DishController {
      */
     @GetMapping("/list")
     public Result<List<DishDto>> list (Dish dish){
+
+        List<DishDto> dishDtoList = null;
+
+        //設定動態存儲在redis的key值
+        String key = "dish_"+dish.getCategoryId()+"_"+dish.getStatus();
+
+        //獲取redis緩存中的資料
+        dishDtoList = (List<DishDto>)redisTemplate.opsForValue().get(key);
+
+        //判斷是否redis緩存存有資料
+        if (dishDtoList != null) {
+
+        //有資料則直接返回數據
+            return Result.success(dishDtoList);
+        }
+
+
+        //無資料查詢資料庫
+
+
         //創建查詢條件物件
         LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
 
@@ -205,7 +246,7 @@ public class DishController {
         List<Dish> dishList = dishService.list(queryWrapper);
 
         //把Dish封裝成DishDto
-        List<DishDto> dishDtoList = dishList.stream().map((item)->{
+        dishDtoList = dishList.stream().map((item)->{
 
             //用dishId查詢Flavor表,結果封裝進 DishDto
             DishDto dishDto = dishService.getByIdWithFlavor(item.getId());
@@ -213,6 +254,11 @@ public class DishController {
             return dishDto;
 
         }).collect(Collectors.toList());
+
+        //將查詢完的資料存入redis緩存
+        redisTemplate.opsForValue().set(key , dishDtoList , 60l , TimeUnit.MINUTES);
+
+
 
         return Result.success(dishDtoList);
     }
