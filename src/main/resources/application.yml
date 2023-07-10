@@ -1,0 +1,44 @@
+server:
+  port: 8080
+spring:
+  application:
+    #應用的名稱, 可選
+    name: seafood_take_out
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/seafood?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: root
+      password: 1234
+   #mail配置
+  mail:
+    host: smtp.gmail.com
+    username: q964821337@gmail.com
+    password: rqakesxblwqkcmlq
+    default-encoding: utf-8
+    protocol: smtps
+    port: 465
+  #redis配置
+  redis:
+    host: localhost
+    port: 6379
+    #password:
+    database: 0
+    jedis:
+      pool:
+        max-active: 8 #最大連接數
+        max-wait: 1ms #最大等待時間
+        max-idle: 4 #連接池中最大空閒連結
+        min-idle: 4 #連接池中最小空閒連結
+
+mybatis-plus:
+  configuration:
+    #在映射实体或者属性时，将数据库中表名和字段名中的下划线去掉，按照驼峰命名法映射
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: ASSIGN_ID
+#自訂數據
+seafood:
+  path: D:\img\
